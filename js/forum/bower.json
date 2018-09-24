@@ -1,0 +1,6 @@
+{
+  "name": "forum",
+  "dependencies": {
+    "Caret.js": "^0.3.1"
+  }
+}

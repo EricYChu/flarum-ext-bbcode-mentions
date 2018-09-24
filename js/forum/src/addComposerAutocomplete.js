@@ -15,22 +15,73 @@ export default function addComposerAutocomplete() {
     if (isInitialized) return;
 
     const composer = this;
+    const $editorContainer = $('.sceditor-container');
+    const iframe = $editorContainer.find('iframe')[0];
+    const $iframe = $(iframe);
     const $container = $('<div class="ComposerBody-mentionsDropdownContainer"></div>');
     const dropdown = new AutocompleteDropdown({items: []});
-    const $textarea = this.$('textarea').wrap('<div class="ComposerBody-mentionsWrapper"></div>');
+    var $textarea = $(iframe.contentDocument.body);
     const searched = [];
     let mentionStart;
     let typed;
     let searchTimeout;
+    let node;
+
+    $(composer.element).append($container);
+
+    const getCaretCharacterOffsetWithin = function getCaretCharacterOffsetWithin(element) {
+      var caretOffset = 0;
+      var doc = element.ownerDocument || element.document;
+      var win = doc.defaultView || doc.parentWindow;
+      var sel;
+      if (typeof win.getSelection !== 'undefined') {
+        sel = win.getSelection();
+        if (sel.rangeCount > 0) {
+          var range = sel.getRangeAt(0);
+          var preCaretRange = range.cloneRange();
+          preCaretRange.selectNodeContents(element);
+          preCaretRange.setEnd(range.endContainer, range.endOffset);
+          caretOffset = preCaretRange.toString().length;
+        }
+      } else if ( (sel = doc.selection) && sel.type != 'Control') {
+        var textRange = sel.createRange();
+        var preCaretTextRange = doc.body.createTextRange();
+        preCaretTextRange.moveToElementText(element);
+        preCaretTextRange.setEndPoint('EndToEnd', textRange);
+        caretOffset = preCaretTextRange.text.length;
+      }
+      return caretOffset;
+    };
+
+    const setCaretCharacterOffsetWithin = function setCaretCharacterOffsetWithin(element, pos) {
+      composer.editor.editor.focus();
+      var doc = element.ownerDocument || element.document;
+      var win = doc.defaultView || doc.parentWindow;
+      var sel;
+      if (typeof win.getSelection !== 'undefined') {
+        sel = win.getSelection();
+        if (sel.rangeCount > 0) {
+          var range = sel.getRangeAt(0);
+          range.collapse(true);
+          range.setStart(element, pos);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else if ( (sel = doc.selection) && sel.type != 'Control') {
+          var textRange = sel.createRange();
+          var preCaretTextRange = doc.body.createTextRange();
+          preCaretTextRange.moveToElementText(element);
+          preCaretTextRange.setEndPoint('StartToStart', textRange);
+        }
+      }
+    };
 
     const applySuggestion = function(replacement) {
       const insert = replacement + ' ';
 
-      const content = composer.content();
-      composer.editor.setValue(content.substring(0, mentionStart - 1) + insert + content.substr($textarea[0].selectionStart));
+      node.nodeValue = node.nodeValue.substring(0, mentionStart - 1) + insert + node.nodeValue.substr(getCaretCharacterOffsetWithin(node));
 
-      const index = mentionStart - 1 + insert.length;
-      composer.editor.setSelectionRange(index, index);
+      var index = mentionStart - 1 + insert.length;
+      setCaretCharacterOffsetWithin(node, index);
 
       dropdown.hide();
     };
@@ -44,25 +95,25 @@ export default function addComposerAutocomplete() {
       .onCancel(dropdown.hide.bind(dropdown))
       .bindTo($textarea);
 
-    $textarea
-      .after($container)
-      .on('click keyup', function(e) {
+    composer.editor.editor
+      .bind('keyup', function (e) {
         // Up, down, enter, tab, escape, left, right.
         if ([9, 13, 27, 40, 38, 37, 39].indexOf(e.which) !== -1) return;
 
-        const cursor = this.selectionStart;
-
-        if (this.selectionEnd - cursor > 0) return;
+        node = composer.editor.editor.currentNode();
+        const cursor = getCaretCharacterOffsetWithin(node);
 
         // Search backwards from the cursor for an '@' symbol, without any
         // intervening whitespace. If we find one, we will want to show the
         // autocomplete dropdown!
-        const value = this.value;
+        const value = node.nodeValue;
+        if (value === null) return;
         mentionStart = 0;
         for (let i = cursor - 1; i >= 0; i--) {
           const character = value.substr(i, 1);
           if (/\s/.test(character)) break;
           if (character === '@') {
+            if (i > 0 && !/\s/.test(value.substr(i - 1, 1))) break;
             mentionStart = i + 1;
             break;
           }
@@ -141,7 +192,13 @@ export default function addComposerAutocomplete() {
               m.render($container[0], dropdown.render());
 
               dropdown.show();
-              const coordinates = getCaretCoordinates(this, mentionStart);
+
+              const coordinates = $textarea.caret('offset', {iframe: iframe});
+              const offset1 = $editorContainer.position();
+              const offset2 = $iframe.position();
+              coordinates.left += offset1.left + offset2.left;
+              coordinates.top += offset1.top + offset2.top;
+
               const width = dropdown.$().outerWidth();
               const height = dropdown.$().outerHeight();
               const parent = dropdown.$().offsetParent();

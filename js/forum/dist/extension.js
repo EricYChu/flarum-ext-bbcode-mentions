@@ -1,133 +1,439 @@
-/* jshint browser: true */
-
-(function () {
-
-// The properties that we copy into a mirrored div.
-// Note that some browsers, such as Firefox,
-// do not concatenate properties, i.e. padding-top, bottom etc. -> padding,
-// so we have to do every single property specifically.
-var properties = [
-  'direction',  // RTL support
-  'boxSizing',
-  'width',  // on Chrome and IE, exclude the scrollbar, so the mirror div wraps exactly as the textarea does
-  'height',
-  'overflowX',
-  'overflowY',  // copy the scrollbar for IE
-
-  'borderTopWidth',
-  'borderRightWidth',
-  'borderBottomWidth',
-  'borderLeftWidth',
-  'borderStyle',
-
-  'paddingTop',
-  'paddingRight',
-  'paddingBottom',
-  'paddingLeft',
-
-  // https://developer.mozilla.org/en-US/docs/Web/CSS/font
-  'fontStyle',
-  'fontVariant',
-  'fontWeight',
-  'fontStretch',
-  'fontSize',
-  'fontSizeAdjust',
-  'lineHeight',
-  'fontFamily',
-
-  'textAlign',
-  'textTransform',
-  'textIndent',
-  'textDecoration',  // might not make a difference, but better be safe
-
-  'letterSpacing',
-  'wordSpacing',
-
-  'tabSize',
-  'MozTabSize'
-
-];
-
-var isBrowser = (typeof window !== 'undefined');
-var isFirefox = (isBrowser && window.mozInnerScreenX != null);
-
-function getCaretCoordinates(element, position, options) {
-  if(!isBrowser) {
-    throw new Error('textarea-caret-position#getCaretCoordinates should only be called in a browser');
-  }
-
-  var debug = options && options.debug || false;
-  if (debug) {
-    var el = document.querySelector('#input-textarea-caret-position-mirror-div');
-    if ( el ) { el.parentNode.removeChild(el); }
-  }
-
-  // mirrored div
-  var div = document.createElement('div');
-  div.id = 'input-textarea-caret-position-mirror-div';
-  document.body.appendChild(div);
-
-  var style = div.style;
-  var computed = window.getComputedStyle? getComputedStyle(element) : element.currentStyle;  // currentStyle for IE < 9
-
-  // default textarea styles
-  style.whiteSpace = 'pre-wrap';
-  if (element.nodeName !== 'INPUT')
-    style.wordWrap = 'break-word';  // only for textarea-s
-
-  // position off-screen
-  style.position = 'absolute';  // required to return coordinates properly
-  if (!debug)
-    style.visibility = 'hidden';  // not 'display: none' because we want rendering
-
-  // transfer the element's properties to the div
-  properties.forEach(function (prop) {
-    style[prop] = computed[prop];
-  });
-
-  if (isFirefox) {
-    // Firefox lies about the overflow property for textareas: https://bugzilla.mozilla.org/show_bug.cgi?id=984275
-    if (element.scrollHeight > parseInt(computed.height))
-      style.overflowY = 'scroll';
+(function (root, factory) {
+  if (typeof define === 'function' && define.amd) {
+    // AMD. Register as an anonymous module.
+    define(["jquery"], function ($) {
+      return (root.returnExportsGlobal = factory($));
+    });
+  } else if (typeof exports === 'object') {
+    // Node. Does not work with strict CommonJS, but
+    // only CommonJS-like enviroments that support module.exports,
+    // like Node.
+    module.exports = factory(require("jquery"));
   } else {
-    style.overflow = 'hidden';  // for Chrome to not render a scrollbar; IE keeps overflowY = 'scroll'
+    factory(jQuery);
+  }
+}(this, function ($) {
+
+/*
+  Implement Github like autocomplete mentions
+  http://ichord.github.com/At.js
+
+  Copyright (c) 2013 chord.luo@gmail.com
+  Licensed under the MIT license.
+*/
+
+/*
+本插件操作 textarea 或者 input 内的插入符
+只实现了获得插入符在文本框中的位置，我设置
+插入符的位置.
+*/
+
+"use strict";
+var EditableCaret, InputCaret, Mirror, Utils, discoveryIframeOf, methods, oDocument, oFrame, oWindow, pluginName, setContextBy;
+
+pluginName = 'caret';
+
+EditableCaret = (function() {
+  function EditableCaret($inputor) {
+    this.$inputor = $inputor;
+    this.domInputor = this.$inputor[0];
   }
 
-  div.textContent = element.value.substring(0, position);
-  // the second special handling for input type="text" vs textarea: spaces need to be replaced with non-breaking spaces - http://stackoverflow.com/a/13402035/1269037
-  if (element.nodeName === 'INPUT')
-    div.textContent = div.textContent.replace(/\s/g, '\u00a0');
-
-  var span = document.createElement('span');
-  // Wrapping must be replicated *exactly*, including when a long word gets
-  // onto the next line, with whitespace at the end of the line before (#7).
-  // The  *only* reliable way to do that is to copy the *entire* rest of the
-  // textarea's content into the <span> created at the caret position.
-  // for inputs, just '.' would be enough, but why bother?
-  span.textContent = element.value.substring(position) || '.';  // || because a completely empty faux span doesn't render at all
-  div.appendChild(span);
-
-  var coordinates = {
-    top: span.offsetTop + parseInt(computed['borderTopWidth']),
-    left: span.offsetLeft + parseInt(computed['borderLeftWidth'])
+  EditableCaret.prototype.setPos = function(pos) {
+    var fn, found, offset, sel;
+    if (sel = oWindow.getSelection()) {
+      offset = 0;
+      found = false;
+      (fn = function(pos, parent) {
+        var node, range, _i, _len, _ref, _results;
+        _ref = parent.childNodes;
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          node = _ref[_i];
+          if (found) {
+            break;
+          }
+          if (node.nodeType === 3) {
+            if (offset + node.length >= pos) {
+              found = true;
+              range = oDocument.createRange();
+              range.setStart(node, pos - offset);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              break;
+            } else {
+              _results.push(offset += node.length);
+            }
+          } else {
+            _results.push(fn(pos, node));
+          }
+        }
+        return _results;
+      })(pos, this.domInputor);
+    }
+    return this.domInputor;
   };
 
-  if (debug) {
-    span.style.backgroundColor = '#aaa';
-  } else {
-    document.body.removeChild(div);
+  EditableCaret.prototype.getIEPosition = function() {
+    return this.getPosition();
+  };
+
+  EditableCaret.prototype.getPosition = function() {
+    var inputor_offset, offset;
+    offset = this.getOffset();
+    inputor_offset = this.$inputor.offset();
+    offset.left -= inputor_offset.left;
+    offset.top -= inputor_offset.top;
+    return offset;
+  };
+
+  EditableCaret.prototype.getOldIEPos = function() {
+    var preCaretTextRange, textRange;
+    textRange = oDocument.selection.createRange();
+    preCaretTextRange = oDocument.body.createTextRange();
+    preCaretTextRange.moveToElementText(this.domInputor);
+    preCaretTextRange.setEndPoint("EndToEnd", textRange);
+    return preCaretTextRange.text.length;
+  };
+
+  EditableCaret.prototype.getPos = function() {
+    var clonedRange, pos, range;
+    if (range = this.range()) {
+      clonedRange = range.cloneRange();
+      clonedRange.selectNodeContents(this.domInputor);
+      clonedRange.setEnd(range.endContainer, range.endOffset);
+      pos = clonedRange.toString().length;
+      clonedRange.detach();
+      return pos;
+    } else if (oDocument.selection) {
+      return this.getOldIEPos();
+    }
+  };
+
+  EditableCaret.prototype.getOldIEOffset = function() {
+    var range, rect;
+    range = oDocument.selection.createRange().duplicate();
+    range.moveStart("character", -1);
+    rect = range.getBoundingClientRect();
+    return {
+      height: rect.bottom - rect.top,
+      left: rect.left,
+      top: rect.top
+    };
+  };
+
+  EditableCaret.prototype.getOffset = function(pos) {
+    var clonedRange, offset, range, rect, shadowCaret;
+    if (oWindow.getSelection && (range = this.range())) {
+      if (range.endOffset - 1 > 0 && range.endContainer !== this.domInputor) {
+        clonedRange = range.cloneRange();
+        clonedRange.setStart(range.endContainer, range.endOffset - 1);
+        clonedRange.setEnd(range.endContainer, range.endOffset);
+        rect = clonedRange.getBoundingClientRect();
+        offset = {
+          height: rect.height,
+          left: rect.left + rect.width,
+          top: rect.top
+        };
+        clonedRange.detach();
+      }
+      if (!offset || (offset != null ? offset.height : void 0) === 0) {
+        clonedRange = range.cloneRange();
+        shadowCaret = $(oDocument.createTextNode("|"));
+        clonedRange.insertNode(shadowCaret[0]);
+        clonedRange.selectNode(shadowCaret[0]);
+        rect = clonedRange.getBoundingClientRect();
+        offset = {
+          height: rect.height,
+          left: rect.left,
+          top: rect.top
+        };
+        shadowCaret.remove();
+        clonedRange.detach();
+      }
+    } else if (oDocument.selection) {
+      offset = this.getOldIEOffset();
+    }
+    if (offset) {
+      offset.top += $(oWindow).scrollTop();
+      offset.left += $(oWindow).scrollLeft();
+    }
+    return offset;
+  };
+
+  EditableCaret.prototype.range = function() {
+    var sel;
+    if (!oWindow.getSelection) {
+      return;
+    }
+    sel = oWindow.getSelection();
+    if (sel.rangeCount > 0) {
+      return sel.getRangeAt(0);
+    } else {
+      return null;
+    }
+  };
+
+  return EditableCaret;
+
+})();
+
+InputCaret = (function() {
+  function InputCaret($inputor) {
+    this.$inputor = $inputor;
+    this.domInputor = this.$inputor[0];
   }
 
-  return coordinates;
-}
+  InputCaret.prototype.getIEPos = function() {
+    var endRange, inputor, len, normalizedValue, pos, range, textInputRange;
+    inputor = this.domInputor;
+    range = oDocument.selection.createRange();
+    pos = 0;
+    if (range && range.parentElement() === inputor) {
+      normalizedValue = inputor.value.replace(/\r\n/g, "\n");
+      len = normalizedValue.length;
+      textInputRange = inputor.createTextRange();
+      textInputRange.moveToBookmark(range.getBookmark());
+      endRange = inputor.createTextRange();
+      endRange.collapse(false);
+      if (textInputRange.compareEndPoints("StartToEnd", endRange) > -1) {
+        pos = len;
+      } else {
+        pos = -textInputRange.moveStart("character", -len);
+      }
+    }
+    return pos;
+  };
 
-if (typeof module != 'undefined' && typeof module.exports != 'undefined') {
-  module.exports = getCaretCoordinates;
-} else if(isBrowser){
-  window.getCaretCoordinates = getCaretCoordinates;
-}
+  InputCaret.prototype.getPos = function() {
+    if (oDocument.selection) {
+      return this.getIEPos();
+    } else {
+      return this.domInputor.selectionStart;
+    }
+  };
 
-}());
+  InputCaret.prototype.setPos = function(pos) {
+    var inputor, range;
+    inputor = this.domInputor;
+    if (oDocument.selection) {
+      range = inputor.createTextRange();
+      range.move("character", pos);
+      range.select();
+    } else if (inputor.setSelectionRange) {
+      inputor.setSelectionRange(pos, pos);
+    }
+    return inputor;
+  };
+
+  InputCaret.prototype.getIEOffset = function(pos) {
+    var h, textRange, x, y;
+    textRange = this.domInputor.createTextRange();
+    pos || (pos = this.getPos());
+    textRange.move('character', pos);
+    x = textRange.boundingLeft;
+    y = textRange.boundingTop;
+    h = textRange.boundingHeight;
+    return {
+      left: x,
+      top: y,
+      height: h
+    };
+  };
+
+  InputCaret.prototype.getOffset = function(pos) {
+    var $inputor, offset, position;
+    $inputor = this.$inputor;
+    if (oDocument.selection) {
+      offset = this.getIEOffset(pos);
+      offset.top += $(oWindow).scrollTop() + $inputor.scrollTop();
+      offset.left += $(oWindow).scrollLeft() + $inputor.scrollLeft();
+      return offset;
+    } else {
+      offset = $inputor.offset();
+      position = this.getPosition(pos);
+      return offset = {
+        left: offset.left + position.left - $inputor.scrollLeft(),
+        top: offset.top + position.top - $inputor.scrollTop(),
+        height: position.height
+      };
+    }
+  };
+
+  InputCaret.prototype.getPosition = function(pos) {
+    var $inputor, at_rect, end_range, format, html, mirror, start_range;
+    $inputor = this.$inputor;
+    format = function(value) {
+      value = value.replace(/<|>|`|"|&/g, '?').replace(/\r\n|\r|\n/g, "<br/>");
+      if (/firefox/i.test(navigator.userAgent)) {
+        value = value.replace(/\s/g, '&nbsp;');
+      }
+      return value;
+    };
+    if (pos === void 0) {
+      pos = this.getPos();
+    }
+    start_range = $inputor.val().slice(0, pos);
+    end_range = $inputor.val().slice(pos);
+    html = "<span style='position: relative; display: inline;'>" + format(start_range) + "</span>";
+    html += "<span id='caret' style='position: relative; display: inline;'>|</span>";
+    html += "<span style='position: relative; display: inline;'>" + format(end_range) + "</span>";
+    mirror = new Mirror($inputor);
+    return at_rect = mirror.create(html).rect();
+  };
+
+  InputCaret.prototype.getIEPosition = function(pos) {
+    var h, inputorOffset, offset, x, y;
+    offset = this.getIEOffset(pos);
+    inputorOffset = this.$inputor.offset();
+    x = offset.left - inputorOffset.left;
+    y = offset.top - inputorOffset.top;
+    h = offset.height;
+    return {
+      left: x,
+      top: y,
+      height: h
+    };
+  };
+
+  return InputCaret;
+
+})();
+
+Mirror = (function() {
+  Mirror.prototype.css_attr = ["borderBottomWidth", "borderLeftWidth", "borderRightWidth", "borderTopStyle", "borderRightStyle", "borderBottomStyle", "borderLeftStyle", "borderTopWidth", "boxSizing", "fontFamily", "fontSize", "fontWeight", "height", "letterSpacing", "lineHeight", "marginBottom", "marginLeft", "marginRight", "marginTop", "outlineWidth", "overflow", "overflowX", "overflowY", "paddingBottom", "paddingLeft", "paddingRight", "paddingTop", "textAlign", "textOverflow", "textTransform", "whiteSpace", "wordBreak", "wordWrap"];
+
+  function Mirror($inputor) {
+    this.$inputor = $inputor;
+  }
+
+  Mirror.prototype.mirrorCss = function() {
+    var css,
+      _this = this;
+    css = {
+      position: 'absolute',
+      left: -9999,
+      top: 0,
+      zIndex: -20000
+    };
+    if (this.$inputor.prop('tagName') === 'TEXTAREA') {
+      this.css_attr.push('width');
+    }
+    $.each(this.css_attr, function(i, p) {
+      return css[p] = _this.$inputor.css(p);
+    });
+    return css;
+  };
+
+  Mirror.prototype.create = function(html) {
+    this.$mirror = $('<div></div>');
+    this.$mirror.css(this.mirrorCss());
+    this.$mirror.html(html);
+    this.$inputor.after(this.$mirror);
+    return this;
+  };
+
+  Mirror.prototype.rect = function() {
+    var $flag, pos, rect;
+    $flag = this.$mirror.find("#caret");
+    pos = $flag.position();
+    rect = {
+      left: pos.left,
+      top: pos.top,
+      height: $flag.height()
+    };
+    this.$mirror.remove();
+    return rect;
+  };
+
+  return Mirror;
+
+})();
+
+Utils = {
+  contentEditable: function($inputor) {
+    return !!($inputor[0].contentEditable && $inputor[0].contentEditable === 'true');
+  }
+};
+
+methods = {
+  pos: function(pos) {
+    if (pos || pos === 0) {
+      return this.setPos(pos);
+    } else {
+      return this.getPos();
+    }
+  },
+  position: function(pos) {
+    if (oDocument.selection) {
+      return this.getIEPosition(pos);
+    } else {
+      return this.getPosition(pos);
+    }
+  },
+  offset: function(pos) {
+    var offset;
+    offset = this.getOffset(pos);
+    return offset;
+  }
+};
+
+oDocument = null;
+
+oWindow = null;
+
+oFrame = null;
+
+setContextBy = function(settings) {
+  var iframe;
+  if (iframe = settings != null ? settings.iframe : void 0) {
+    oFrame = iframe;
+    oWindow = iframe.contentWindow;
+    return oDocument = iframe.contentDocument || oWindow.document;
+  } else {
+    oFrame = void 0;
+    oWindow = window;
+    return oDocument = document;
+  }
+};
+
+discoveryIframeOf = function($dom) {
+  var error;
+  oDocument = $dom[0].ownerDocument;
+  oWindow = oDocument.defaultView || oDocument.parentWindow;
+  try {
+    return oFrame = oWindow.frameElement;
+  } catch (_error) {
+    error = _error;
+  }
+};
+
+$.fn.caret = function(method, value, settings) {
+  var caret;
+  if (methods[method]) {
+    if ($.isPlainObject(value)) {
+      setContextBy(value);
+      value = void 0;
+    } else {
+      setContextBy(settings);
+    }
+    caret = Utils.contentEditable(this) ? new EditableCaret(this) : new InputCaret(this);
+    return methods[method].apply(caret, [value]);
+  } else {
+    return $.error("Method " + method + " does not exist on jQuery.caret");
+  }
+};
+
+$.fn.caret.EditableCaret = EditableCaret;
+
+$.fn.caret.InputCaret = InputCaret;
+
+$.fn.caret.Utils = Utils;
+
+$.fn.caret.apis = methods;
+
+
+}));
 ;
 'use strict';
 
@@ -140,22 +446,73 @@ System.register('flarum/mentions/addComposerAutocomplete', ['flarum/extend', 'fl
       if (isInitialized) return;
 
       var composer = this;
+      var $editorContainer = $('.sceditor-container');
+      var iframe = $editorContainer.find('iframe')[0];
+      var $iframe = $(iframe);
       var $container = $('<div class="ComposerBody-mentionsDropdownContainer"></div>');
       var dropdown = new AutocompleteDropdown({ items: [] });
-      var $textarea = this.$('textarea').wrap('<div class="ComposerBody-mentionsWrapper"></div>');
+      var $textarea = $(iframe.contentDocument.body);
       var searched = [];
       var mentionStart = void 0;
       var typed = void 0;
       var searchTimeout = void 0;
+      var node = void 0;
+
+      $(composer.element).append($container);
+
+      var getCaretCharacterOffsetWithin = function getCaretCharacterOffsetWithin(element) {
+        var caretOffset = 0;
+        var doc = element.ownerDocument || element.document;
+        var win = doc.defaultView || doc.parentWindow;
+        var sel;
+        if (typeof win.getSelection !== 'undefined') {
+          sel = win.getSelection();
+          if (sel.rangeCount > 0) {
+            var range = sel.getRangeAt(0);
+            var preCaretRange = range.cloneRange();
+            preCaretRange.selectNodeContents(element);
+            preCaretRange.setEnd(range.endContainer, range.endOffset);
+            caretOffset = preCaretRange.toString().length;
+          }
+        } else if ((sel = doc.selection) && sel.type != 'Control') {
+          var textRange = sel.createRange();
+          var preCaretTextRange = doc.body.createTextRange();
+          preCaretTextRange.moveToElementText(element);
+          preCaretTextRange.setEndPoint('EndToEnd', textRange);
+          caretOffset = preCaretTextRange.text.length;
+        }
+        return caretOffset;
+      };
+
+      var setCaretCharacterOffsetWithin = function setCaretCharacterOffsetWithin(element, pos) {
+        composer.editor.editor.focus();
+        var doc = element.ownerDocument || element.document;
+        var win = doc.defaultView || doc.parentWindow;
+        var sel;
+        if (typeof win.getSelection !== 'undefined') {
+          sel = win.getSelection();
+          if (sel.rangeCount > 0) {
+            var range = sel.getRangeAt(0);
+            range.collapse(true);
+            range.setStart(element, pos);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          } else if ((sel = doc.selection) && sel.type != 'Control') {
+            var textRange = sel.createRange();
+            var preCaretTextRange = doc.body.createTextRange();
+            preCaretTextRange.moveToElementText(element);
+            preCaretTextRange.setEndPoint('StartToStart', textRange);
+          }
+        }
+      };
 
       var applySuggestion = function applySuggestion(replacement) {
         var insert = replacement + ' ';
 
-        var content = composer.content();
-        composer.editor.setValue(content.substring(0, mentionStart - 1) + insert + content.substr($textarea[0].selectionStart));
+        node.nodeValue = node.nodeValue.substring(0, mentionStart - 1) + insert + node.nodeValue.substr(getCaretCharacterOffsetWithin(node));
 
         var index = mentionStart - 1 + insert.length;
-        composer.editor.setSelectionRange(index, index);
+        setCaretCharacterOffsetWithin(node, index);
 
         dropdown.hide();
       };
@@ -169,25 +526,24 @@ System.register('flarum/mentions/addComposerAutocomplete', ['flarum/extend', 'fl
         return dropdown.navigate(1);
       }).onSelect(dropdown.complete.bind(dropdown)).onCancel(dropdown.hide.bind(dropdown)).bindTo($textarea);
 
-      $textarea.after($container).on('click keyup', function (e) {
-        var _this = this;
-
+      composer.editor.editor.bind('keyup', function (e) {
         // Up, down, enter, tab, escape, left, right.
         if ([9, 13, 27, 40, 38, 37, 39].indexOf(e.which) !== -1) return;
 
-        var cursor = this.selectionStart;
-
-        if (this.selectionEnd - cursor > 0) return;
+        node = composer.editor.editor.currentNode();
+        var cursor = getCaretCharacterOffsetWithin(node);
 
         // Search backwards from the cursor for an '@' symbol, without any
         // intervening whitespace. If we find one, we will want to show the
         // autocomplete dropdown!
-        var value = this.value;
+        var value = node.nodeValue;
+        if (value === null) return;
         mentionStart = 0;
         for (var i = cursor - 1; i >= 0; i--) {
           var character = value.substr(i, 1);
           if (/\s/.test(character)) break;
           if (character === '@') {
+            if (i > 0 && !/\s/.test(value.substr(i - 1, 1))) break;
             mentionStart = i + 1;
             break;
           }
@@ -266,7 +622,13 @@ System.register('flarum/mentions/addComposerAutocomplete', ['flarum/extend', 'fl
               m.render($container[0], dropdown.render());
 
               dropdown.show();
-              var coordinates = getCaretCoordinates(_this, mentionStart);
+
+              var coordinates = $textarea.caret('offset', { iframe: iframe });
+              var offset1 = $editorContainer.position();
+              var offset2 = $iframe.position();
+              coordinates.left += offset1.left + offset2.left;
+              coordinates.top += offset1.top + offset2.top;
+
               var width = dropdown.$().outerWidth();
               var height = dropdown.$().outerHeight();
               var parent = dropdown.$().offsetParent();
@@ -1195,7 +1557,7 @@ System.register('flarum/mentions/utils/reply', ['flarum/utils/DiscussionControls
     var precedingNewlines = preceding.length == 0 ? 0 : 3 - preceding.match(/(\n{0,2})$/)[0].length;
 
     component.editor.insertAtCursor(Array(precedingNewlines).join('\n') + ( // Insert up to two newlines, depending on preceding whitespace
-    quote ? '> ' + mention + quote.trim().replace(/\n/g, '\n> ') + '\n\n' : mention));
+    quote ? '[QUOTE]' + mention + quote.trim().replace(/\n/g, '\n> ') + '[/QUOTE]' : mention));
   }
 
   function reply(post, quote) {
