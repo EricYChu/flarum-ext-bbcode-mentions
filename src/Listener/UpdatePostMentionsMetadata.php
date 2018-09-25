@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Flarum\Mentions\Listener;
+namespace EricYChu\Mentions\Listener;
 
 use Flarum\Api\Serializer\PostBasicSerializer;
 use Flarum\Core\Notification\NotificationSyncer;
@@ -20,7 +20,7 @@ use Flarum\Event\PostWasHidden;
 use Flarum\Event\PostWasPosted;
 use Flarum\Event\PostWasRestored;
 use Flarum\Event\PostWasRevised;
-use Flarum\Mentions\Notification\PostMentionedBlueprint;
+use EricYChu\Mentions\Notification\PostMentionedBlueprint;
 use Illuminate\Contracts\Events\Dispatcher;
 use s9e\TextFormatter\Utils;
 

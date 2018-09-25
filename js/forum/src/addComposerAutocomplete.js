@@ -20,7 +20,7 @@ export default function addComposerAutocomplete() {
     const $iframe = $(iframe);
     const $container = $('<div class="ComposerBody-mentionsDropdownContainer"></div>');
     const dropdown = new AutocompleteDropdown({items: []});
-    var $textarea = $(iframe.contentDocument.body);
+    const $textarea = $(iframe.contentDocument.body);
     const searched = [];
     let mentionStart;
     let typed;

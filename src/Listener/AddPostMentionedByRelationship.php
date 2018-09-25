@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Flarum\Mentions\Listener;
+namespace EricYChu\Mentions\Listener;
 
 use Flarum\Api\Controller\CreatePostController;
 use Flarum\Api\Controller\ListPostsController;

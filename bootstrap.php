@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-use Flarum\Mentions\Listener;
+use EricYChu\Mentions\Listener;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\View\Factory;
 

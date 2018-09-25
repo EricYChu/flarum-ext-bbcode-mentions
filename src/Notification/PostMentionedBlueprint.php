@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Flarum\Mentions\Notification;
+namespace EricYChu\Mentions\Notification;
 
 use Flarum\Core\Notification\BlueprintInterface;
 use Flarum\Core\Notification\MailableInterface;

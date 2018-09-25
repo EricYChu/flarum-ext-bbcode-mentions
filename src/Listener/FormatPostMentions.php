@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Flarum\Mentions\Listener;
+namespace EricYChu\Mentions\Listener;
 
 use Flarum\Core\Post\CommentPost;
 use Flarum\Event\ConfigureFormatter;
