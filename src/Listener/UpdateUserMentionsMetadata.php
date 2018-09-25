@@ -9,11 +9,11 @@
  * file that was distributed with this source code.
  */
 
-namespace Flarum\Mentions\Listener;
+namespace EricYChu\Mentions\Listener;
 
 use Flarum\Api\Serializer\PostSerializer;
 use Flarum\Event\ConfigureNotificationTypes;
-use Flarum\Mentions\Notification\UserMentionedBlueprint;
+use EricYChu\Mentions\Notification\UserMentionedBlueprint;
 use Flarum\Notification\NotificationSyncer;
 use Flarum\Post\Event\Deleted;
 use Flarum\Post\Event\Hidden;

@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Flarum\Mentions\Listener;
+namespace EricYChu\Mentions\Listener;
 
 use Flarum\Formatter\Event\Configuring;
 use Flarum\Formatter\Event\Rendering;

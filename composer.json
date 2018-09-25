@@ -1,6 +1,6 @@
 {
-    "name": "flarum/flarum-ext-mentions",
-    "description": "Mention and reply to specific posts and users.",
+    "name": "ericychu/flarum-ext-bbcode-mentions",
+    "description": "Mention and reply to specific posts and users. Only for BBCode WYSIWYG Editor extension.",
     "type": "flarum-extension",
     "keywords": ["discussion"],
     "license": "MIT",
@@ -8,6 +8,10 @@
         {
             "name": "Toby Zerner",
             "email": "toby.zerner@gmail.com"
+        },
+        {
+            "name": "Eric Chu",
+            "email": "ericchu@acgn.io"
         }
     ],
     "support": {
@@ -27,7 +31,7 @@
             "dev-master": "0.1.x-dev"
         },
         "flarum-extension": {
-            "title": "Mentions",
+            "title": "Mentions for BBCode WYSIWYG Editor",
             "icon": {
                 "name": "fas fa-at",
                 "backgroundColor": "#539EC1",
