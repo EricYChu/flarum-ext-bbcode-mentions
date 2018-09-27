@@ -1557,7 +1557,7 @@ System.register('flarum/mentions/utils/reply', ['flarum/utils/DiscussionControls
     var precedingNewlines = preceding.length == 0 ? 0 : 3 - preceding.match(/(\n{0,2})$/)[0].length;
 
     component.editor.insertAtCursor(Array(precedingNewlines).join('\n') + ( // Insert up to two newlines, depending on preceding whitespace
-    quote ? '[QUOTE]' + mention + quote.trim().replace(/\n/g, '\n> ') + '[/QUOTE]' : mention));
+    quote ? '[quote]' + mention + quote.trim() + '[/quote]' : mention));
   }
 
   function reply(post, quote) {
@@ -1598,14 +1598,50 @@ System.register('flarum/mentions/utils/selectedText', [], function (_export, _co
           return this.alt;
         });
 
-        // Replace all other images with a Markdown image
+        // Replace all other images with a BBCode image
         clone.find('img').replaceWith(function () {
-          return '![](' + this.src + ')';
+          return '[img src=' + this.src + ']';
         });
 
-        // Replace all links with a Markdown link
+        // Replace all links with a BBCode link
         clone.find('a').replaceWith(function () {
-          return '[' + this.innerText + '](' + this.href + ')';
+          return '[url=' + this.href + ']' + this.innerText + '[/url]';
+        });
+
+        clone.find('ul').replaceWith(function () {
+          return '[ul]' + this.innerText + '[/ul]';
+        });
+
+        clone.find('ol').replaceWith(function () {
+          return '[ol]' + this.innerText + '[/ol]';
+        });
+
+        clone.find('li').replaceWith(function () {
+          return '[li]' + this.innerText + '[/li]';
+        });
+
+        clone.find('td').replaceWith(function () {
+          return '[td]' + this.innerText + '[/td]';
+        });
+
+        clone.find('th').replaceWith(function () {
+          return '[th]' + this.innerText + '[/th]';
+        });
+
+        clone.find('tr').replaceWith(function () {
+          return '[tr]' + this.innerText + '[/tr]';
+        });
+
+        clone.find('table').replaceWith(function () {
+          return '[table]' + this.innerText + '[/table]';
+        });
+
+        clone.find('p').replaceWith(function () {
+          return this.innerText + '\n';
+        });
+
+        clone.find('br').replaceWith(function () {
+          return '\n';
         });
 
         return clone.text();

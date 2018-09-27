@@ -18,7 +18,7 @@ function insertMention(post, component, quote) {
   component.editor.insertAtCursor(
     Array(precedingNewlines).join('\n') + // Insert up to two newlines, depending on preceding whitespace
     (quote
-      ? '[QUOTE]' + mention + quote.trim().replace(/\n/g, '\n> ') + '[/QUOTE]'
+      ? '[quote]' + mention + quote.trim() + '[/quote]'
       : mention)
   );
 }
