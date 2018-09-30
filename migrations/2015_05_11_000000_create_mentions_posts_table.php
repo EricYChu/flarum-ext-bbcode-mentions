@@ -9,14 +9,20 @@
  * file that was distributed with this source code.
  */
 
-use Flarum\Database\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Schema\Builder;
 
-return Migration::createTable(
-    'mentions_posts',
-    function (Blueprint $table) {
-        $table->integer('post_id')->unsigned();
-        $table->integer('mentions_id')->unsigned();
-        $table->primary(['post_id', 'mentions_id']);
+return [
+    'up' => function (Builder $schema) {
+        if (! $schema->hasTable('mentions_posts')) {
+            $schema->create('mentions_posts', function (Blueprint $table) {
+                $table->integer('post_id')->unsigned();
+                $table->integer('mentions_id')->unsigned();
+                $table->primary(['post_id', 'mentions_id']);
+            });
+        }
+    },
+    'down' => function (Builder $schema) {
+        $schema->drop('mentions_posts');
     }
-);
+];
